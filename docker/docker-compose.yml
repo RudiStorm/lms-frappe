@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  backend:
+    environment:
+      PATH: /home/frappe/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
   mariadb:
     image: mariadb:10.8
     command:
