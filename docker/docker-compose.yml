@@ -1,3 +1,23 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10.8
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+
   frappe:
     image: frappe/bench:latest
     command: >
@@ -65,3 +85,7 @@
       - "8082:8082"
       - "9000:9000"
     restart: unless-stopped
+
+volumes:
+  mariadb-data:
+  frappe-bench:
