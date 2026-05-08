@@ -1,28 +1,18 @@
-version: "3.8"
-
-services:
-  mariadb:
-    image: mariadb:10.8
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --skip-character-set-client-handshake
-      - --skip-innodb-read-only-compressed
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
-    volumes:
-      - mariadb-data:/var/lib/mysql
-    restart: unless-stopped
-
-  redis:
-    image: redis:alpine
-    restart: unless-stopped
-
   frappe:
     image: frappe/bench:latest
     command: >
       bash -lc '
         set -e;
+
+        export PATH="/home/frappe/.local/bin:${PATH}";
+        export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}";
+
+        if ! command -v bench >/dev/null 2>&1; then
+          echo "bench not found on PATH";
+          echo "PATH=${PATH}";
+          ls -la /home/frappe/.local/bin || true;
+          exit 1;
+        fi;
 
         if [ -d /home/frappe/frappe-bench/apps/frappe ]; then
           echo "Bench already exists, starting...";
@@ -31,7 +21,6 @@ services:
           bench start;
         else
           echo "Creating new bench...";
-          export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}";
 
           bench init --skip-redis-config-generation frappe-bench;
           cd frappe-bench;
@@ -76,7 +65,3 @@ services:
       - "8082:8082"
       - "9000:9000"
     restart: unless-stopped
-
-volumes:
-  mariadb-data:
-  frappe-bench:
