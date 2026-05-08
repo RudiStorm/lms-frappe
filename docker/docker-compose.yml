@@ -1,31 +1,67 @@
-frappe:
-  image: frappe/bench:latest
-  command: >
-    bash -lc '
-      cd /home/frappe &&
-      if [ ! -d frappe-bench/apps/lms ]; then
-        bench init --skip-redis-config-generation frappe-bench &&
-        cd frappe-bench &&
-        bench set-config -g db_host mariadb &&
-        bench set-config -g redis_cache redis://redis-cache:6379 &&
-        bench set-config -g redis_queue redis://redis-queue:6379 &&
-        bench set-config -g redis_socketio redis://redis-queue:6379 &&
-        bench get-app payments &&
-        bench get-app lms https://github.com/frappe/lms &&
-        bench new-site lms.localhost \
-          --force \
-          --mariadb-root-password "$MYSQL_ROOT_PASSWORD" \
-          --admin-password admin \
-          --no-mariadb-socket &&
-        bench --site lms.localhost install-app lms
-      fi &&
-      cd /home/frappe/frappe-bench &&
-      sed -i "s/serve --port 8000/serve --port 8082/g" Procfile &&
-      bench start
-    '
-  environment:
-    SHELL: /bin/bash
-    MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-  ports:
-    - "8000"
-    - "9000"
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10.8
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+
+  redis-cache:
+    image: redis:alpine
+    restart: unless-stopped
+
+  redis-queue:
+    image: redis:alpine
+    restart: unless-stopped
+
+  frappe:
+    image: frappe/bench:latest
+    command: >
+      bash -lc '
+        cd /home/frappe &&
+        if [ ! -d frappe-bench/apps/lms ]; then
+          bench init --skip-redis-config-generation frappe-bench &&
+          cd frappe-bench &&
+          bench set-config -g db_host mariadb &&
+          bench set-config -g redis_cache redis://redis-cache:6379 &&
+          bench set-config -g redis_queue redis://redis-queue:6379 &&
+          bench set-config -g redis_socketio redis://redis-queue:6379 &&
+          bench get-app payments &&
+          bench get-app lms https://github.com/frappe/lms &&
+          bench new-site lms.localhost \
+            --force \
+            --mariadb-root-password "$MYSQL_ROOT_PASSWORD" \
+            --admin-password admin \
+            --no-mariadb-socket &&
+          bench --site lms.localhost install-app lms
+        fi &&
+        cd /home/frappe/frappe-bench &&
+        sed -i "s/serve --port 8000/serve --port 8082/g" Procfile &&
+        bench start
+      '
+    working_dir: /home/frappe
+    environment:
+      SHELL: /bin/bash
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      - mariadb
+      - redis-cache
+      - redis-queue
+    volumes:
+      - frappe-bench:/home/frappe/frappe-bench
+    ports:
+      - "8082:8082"
+      - "9000:9000"
+    restart: unless-stopped
+
+volumes:
+  mariadb-data:
+  frappe-bench:
