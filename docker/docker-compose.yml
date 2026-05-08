@@ -1,9 +1,6 @@
 version: "3.8"
 
 services:
-  backend:
-    environment:
-      PATH: /home/frappe/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
   mariadb:
     image: mariadb:10.8
     command:
@@ -27,12 +24,11 @@ services:
       bash -lc '
         set -e;
 
-        export PATH="/home/frappe/.local/bin:${PATH}";
-        export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}";
+        export PATH="/home/frappe/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
         if ! command -v bench >/dev/null 2>&1; then
           echo "bench not found on PATH";
-          echo "PATH=${PATH}";
+          echo "PATH=$$PATH";
           ls -la /home/frappe/.local/bin || true;
           exit 1;
         fi;
@@ -53,16 +49,16 @@ services:
           bench set-redis-queue-host redis://redis:6379;
           bench set-redis-socketio-host redis://redis:6379;
 
-          sed -i "/redis/d" ./Procfile;
-          sed -i "/watch/d" ./Procfile;
-          sed -i "s/serve --port 8000/serve --port 8082/g" ./Procfile;
+          sed -i "/redis/d" ./Procfile || true;
+          sed -i "/watch/d" ./Procfile || true;
+          sed -i "s/serve --port 8000/serve --port 8082/g" ./Procfile || true;
 
           bench get-app payments;
           bench get-app lms https://github.com/frappe/lms;
 
           bench new-site lms.localhost \
             --force \
-            --mariadb-root-password "${MYSQL_ROOT_PASSWORD:-123}" \
+            --mariadb-root-password "$${MYSQL_ROOT_PASSWORD:-123}" \
             --admin-password admin \
             --no-mariadb-socket;
 
@@ -78,6 +74,7 @@ services:
     environment:
       SHELL: /bin/bash
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+      PATH: /home/frappe/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     working_dir: /home/frappe
     volumes:
       - frappe-bench:/home/frappe/frappe-bench
