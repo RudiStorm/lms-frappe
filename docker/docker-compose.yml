@@ -9,16 +9,12 @@ services:
       - --skip-character-set-client-handshake
       - --skip-innodb-read-only-compressed
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
     volumes:
       - mariadb-data:/var/lib/mysql
     restart: unless-stopped
 
-  redis-cache:
-    image: redis:alpine
-    restart: unless-stopped
-
-  redis-queue:
+  redis:
     image: redis:alpine
     restart: unless-stopped
 
@@ -26,37 +22,56 @@ services:
     image: frappe/bench:latest
     command: >
       bash -lc '
-        cd /home/frappe &&
-        if [ ! -d frappe-bench/apps/lms ]; then
-          bench init --skip-redis-config-generation frappe-bench &&
-          cd frappe-bench &&
-          bench set-config -g db_host mariadb &&
-          bench set-config -g redis_cache redis://redis-cache:6379 &&
-          bench set-config -g redis_queue redis://redis-queue:6379 &&
-          bench set-config -g redis_socketio redis://redis-queue:6379 &&
-          bench get-app payments &&
-          bench get-app lms https://github.com/frappe/lms &&
+        set -e;
+
+        if [ -d /home/frappe/frappe-bench/apps/frappe ]; then
+          echo "Bench already exists, starting...";
+          cd /home/frappe/frappe-bench;
+          sed -i "s/serve --port 8000/serve --port 8082/g" Procfile || true;
+          bench start;
+        else
+          echo "Creating new bench...";
+          export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}";
+
+          bench init --skip-redis-config-generation frappe-bench;
+          cd frappe-bench;
+
+          bench set-mariadb-host mariadb;
+          bench set-redis-cache-host redis://redis:6379;
+          bench set-redis-queue-host redis://redis:6379;
+          bench set-redis-socketio-host redis://redis:6379;
+
+          sed -i "/redis/d" ./Procfile;
+          sed -i "/watch/d" ./Procfile;
+          sed -i "s/serve --port 8000/serve --port 8082/g" ./Procfile;
+
+          bench get-app payments;
+          bench get-app lms https://github.com/frappe/lms;
+
           bench new-site lms.localhost \
             --force \
-            --mariadb-root-password "$MYSQL_ROOT_PASSWORD" \
+            --mariadb-root-password "${MYSQL_ROOT_PASSWORD:-123}" \
             --admin-password admin \
-            --no-mariadb-socket &&
-          bench --site lms.localhost install-app lms
-        fi &&
-        cd /home/frappe/frappe-bench &&
-        sed -i "s/serve --port 8000/serve --port 8082/g" Procfile &&
-        bench start
+            --no-mariadb-socket;
+
+          bench --site lms.localhost install-app payments;
+          bench --site lms.localhost install-app lms;
+          bench --site lms.localhost set-config developer_mode 1;
+          bench --site lms.localhost clear-cache;
+          bench use lms.localhost;
+
+          bench start;
+        fi
       '
-    working_dir: /home/frappe
     environment:
       SHELL: /bin/bash
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    depends_on:
-      - mariadb
-      - redis-cache
-      - redis-queue
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+    working_dir: /home/frappe
     volumes:
       - frappe-bench:/home/frappe/frappe-bench
+    depends_on:
+      - mariadb
+      - redis
     ports:
       - "8082:8082"
       - "9000:9000"
