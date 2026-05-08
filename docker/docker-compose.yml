@@ -27,5 +27,5 @@ frappe:
     SHELL: /bin/bash
     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
   ports:
-    - "8082:8082"
-    - "9000:9000"
+    - "8000"
+    - "9000"
